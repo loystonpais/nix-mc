@@ -41,17 +41,92 @@
       if system == "linux" || (hasSuffix "-linux" system)
       then "linux"
       else throw "Only 'linux' is currently supported";
+
+    # TODO: Figure out if validating assetType is possible or not
+    validateAssetType = assetType:
+      if assetType == "legacy"
+      then "legacy"
+      else assetType;
   in {
     # Builds a minecraft client
-    # it combines a minecraftDir with a wrapper script
-    # the minecraft dir will be placed in $out/share
+    # Puts minecraft dir at $out/share/minecraft
+    # & creates a wrapper script.
+    # Attributes can be overriden using overrideAttrs
+    # ex: minecraft.overrideAttrs { id = "nixified" };
+    mkMinecraft = {
+      pkgs,
+      lib ? pkgs.lib,
+      jre ? pkgs.jre,
+      stdenv ? pkgs.stdenv,
+      makeWrapper ? pkgs.makeWrapper,
+      libs ?
+        with pkgs; [
+          libpulseaudio
+          xorg.libXcursor
+          xorg.libXrandr
+          xorg.libXxf86vm # Needed only for versions <1.13
+          libGL
+        ],
+      mainClass,
+      minecraftDir,
+      id,
+      accessTokenPath ? misc.dummyTokenPath {inherit (pkgs) writeText;},
+      assetType,
+    }: let
+      assetType' = validateAssetType assetType;
+      libPath = lib.makeLibraryPath libs;
+    in
+      stdenv.mkDerivation rec {
+        name = "minecraft-client-${id}";
+        version = id;
+
+        # These are automatically set as environment variables
+        # so that phase scripts can access them.
+        # Makes overriding possible
+        inherit id;
+        inherit minecraftDir;
+        inherit accessTokenPath;
+        assetType = assetType';
+        inherit libPath;
+        inherit mainClass;
+        inherit jre;
+
+        buildInputs = [
+          makeWrapper
+        ];
+
+        phases = ["installPhase"];
+
+        installPhase = ''
+          mkdir -p $out/bin
+
+          mkdir -p $out/share
+          DIR=$out/share/minecraft
+          ln -s "$minecraftDir" $DIR
+
+          makeWrapper $jre/bin/java $out/bin/minecraft \
+              --add-flags "\$JRE_OPTIONS" \
+              --add-flags "-Djava.library.path='$DIR/natives'" \
+              --add-flags "-cp '$(find $DIR/libraries -name '*.jar' | tr -s '\n' ':')'" \
+              --add-flags "'$mainClass'" \
+              --add-flags "--version '$id'" \
+              --add-flags "--assetsDir ${
+            if assetType' == "legacy"
+            then "$DIR/assets/virtual/legacy"
+            else "$DIR/assets"
+          }" \
+              --add-flags "--assetIndex '$assetType'" \
+              --add-flags "--accessToken \"\$(cat '$accessTokenPath')\"" \
+              --prefix LD_LIBRARY_PATH : "$libPath"
+        '';
+      };
+
     mkMinecraftFromVersionInfo = {
       jre,
       pkgs,
       minecraftDir,
       fetchSha1 ? fetchers.fetchSha1 {inherit (pkgs) fetchurl;},
-      runCommand,
-      makeWrapper,
+      mkMinecraft ? client.mkMinecraft,
       versionInfo ? null,
       url ? null,
       sha1 ? null,
@@ -61,41 +136,19 @@
 
       versionData = readJSON (fetchSha1 versionInfo');
 
-      libPath = lib.makeLibraryPath [
-        pkgs.libpulseaudio
-        pkgs.xorg.libXcursor
-        pkgs.xorg.libXrandr
-        pkgs.xorg.libXxf86vm # Needed only for versions <1.13
-        pkgs.libGL
-      ];
+      assetType = versionData.assets;
     in
-      runCommand "minecraft-client-${versionData.id}" {
-        version = versionData.id;
-        buildInputs = [
-          makeWrapper
-        ];
-      } ''
-        mkdir -p $out/bin
+      mkMinecraft {
+        inherit pkgs;
+        inherit minecraftDir;
+        inherit (versionData) mainClass id;
+        inherit assetType;
+        inherit jre;
+        inherit accessTokenPath;
+      };
 
-        mkdir -p $out/share
-        MINECRAFT_DIR=$out/share/minecraft
-        ln -s ${minecraftDir} $MINECRAFT_DIR
-
-        makeWrapper ${jre}/bin/java $out/bin/minecraft \
-            --add-flags "\$JRE_OPTIONS" \
-            --add-flags "-Djava.library.path='$MINECRAFT_DIR/natives'" \
-            --add-flags "-cp '$(find $MINECRAFT_DIR/libraries -name '*.jar' | tr -s '\n' ':')'" \
-            --add-flags "${versionData.mainClass}" \
-            --add-flags "--version ${versionData.id}" \
-            --add-flags "--assetsDir ${
-          if versionData.assets == "legacy"
-          then "$MINECRAFT_DIR/assets/virtual/legacy"
-          else "$MINECRAFT_DIR/assets"
-        }" \
-            --add-flags "--assetIndex ${versionData.assets}" \
-            --add-flags "--accessToken \"\$(cat ${accessTokenPath})\"" \
-            --prefix LD_LIBRARY_PATH : "${libPath}"
-      '';
+    # TODO: write a generic minecraft dir builder
+    # mkMinecraftDir = {  }
 
     # A minecraft client dir contains
     # natives/
@@ -200,7 +253,7 @@ in
         value = client.mkMinecraftFromVersionInfo {
           inherit versionInfo;
 
-          inherit (pkgs) runCommand makeWrapper jre;
+          inherit (pkgs) jre;
           inherit pkgs;
 
           minecraftDir = client.mkMinecraftDirFromVersionInfo {
