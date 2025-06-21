@@ -77,16 +77,20 @@
       } ''
         mkdir -p $out/bin
 
+        mkdir -p $out/share
+        MINECRAFT_DIR=$out/share/minecraft
+        ln -s ${minecraftDir} $MINECRAFT_DIR
+
         makeWrapper ${jre}/bin/java $out/bin/minecraft \
             --add-flags "\$JRE_OPTIONS" \
-            --add-flags "-Djava.library.path='${minecraftDir}/natives'" \
-            --add-flags "-cp '$(find ${minecraftDir}/libraries -name '*.jar' | tr -s '\n' ':')'" \
+            --add-flags "-Djava.library.path='$MINECRAFT_DIR/natives'" \
+            --add-flags "-cp '$(find $MINECRAFT_DIR/libraries -name '*.jar' | tr -s '\n' ':')'" \
             --add-flags "${versionData.mainClass}" \
             --add-flags "--version ${versionData.id}" \
             --add-flags "--assetsDir ${
           if versionData.assets == "legacy"
-          then "$out/assets/virtual/legacy"
-          else "$out/assets"
+          then "$MINECRAFT_DIR/assets/virtual/legacy"
+          else "$MINECRAFT_DIR/assets"
         }" \
             --add-flags "--assetIndex ${versionData.assets}" \
             --add-flags "--accessToken \"\$(cat ${accessTokenPath})\"" \
