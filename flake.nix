@@ -37,6 +37,8 @@
         inherit servers;
       };
 
+      mc = import ./mc.nix {inherit pkgs;};
+
       formatter = pkgs.alejandra;
     });
 }
