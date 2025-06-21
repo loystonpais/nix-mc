@@ -17,7 +17,15 @@
     nixpkgs,
     flake-utils,
     version-manifest-v2,
-  }:
+  }: let
+    lib = nixpkgs.lib.extend (final: prev: {
+      self = self.lib final;
+    });
+
+    builders = import ./builders {
+      inherit lib;
+    };
+  in
     flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
       pkgs = import nixpkgs {
         inherit system;
@@ -33,12 +41,19 @@
       servers = builtins.mapAttrs (name: value: value.server) minecraft.versions;
     in {
       packages = {
-        inherit clients;
-        inherit servers;
+        oldType = {
+          inherit clients;
+          inherit servers;
+        };
+        builders = builders {
+          manifest = version-manifest-v2;
+          pkgs = pkgs;
+        };
       };
 
-      mc = import ./mc.nix {inherit pkgs;};
-
       formatter = pkgs.alejandra;
-    });
+    })
+    // {
+      lib = import ./lib;
+    };
 }
