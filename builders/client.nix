@@ -1,6 +1,7 @@
 {
   lib,
   misc,
+  system,
   fetchers,
   client,
   ...
@@ -153,18 +154,21 @@ in {
   # TODO: improve this function
   mkMinecraftInstance = {
     minecraft,
-    overrideMinecraftAttrs ? {},
     instanceName,
+    overrideMinecraftAttrs ? {},
     addDesktopItem ? true,
     addShellCommand ? true,
     desktopName ? instanceName,
     commandName ? instanceName,
     icon ? null,
-    gameDir ? "$HOME/.nix-minecraft-launcher/${instanceName}/",
-    pkgs,
+    openInTerminal ? false,
+    comment ? "Nixified Minecraft instance",
+    launchScript ? self.scripts.${system}.mc-client-launch-scripts.standard,
+    pkgs ? self.pkgs,
     makeWrapper ? pkgs.makeWrapper,
     makeDesktopItem ? pkgs.makeDesktopItem,
     writeShellScriptBin ? pkgs.writeShellScriptBin,
+    writeShellScript ? pkgs.writeShellScript,
     symlinkJoin ? pkgs.symlinkJoin,
   } @ attrs: let
     minecraft = attrs.minecraft.overrideAttrs overrideMinecraftAttrs;
@@ -174,15 +178,18 @@ in {
       then attrs.commandName
       else instanceName
     );
+
     icon =
       if addDesktopItem && (attrs ? "icon")
       then attrs.icon
       else throw "icon should be passed if addDesktopItem is set to true";
 
     shellCommand = writeShellScriptBin commandName ''
-      mkdir -p "${gameDir}" || {  echo "Failed to create dir '${gameDir}'"; exit 1;  }
-      cd "${gameDir}" || {  echo "Failed to cd to '${gameDir}'"; exit 1;  }
-      exec "${minecraft}"/bin/minecraft "$@"
+      export MC_COMMAND='${minecraft}/bin/minecraft'
+      export MC_LAUNCH_SCRIPT='${lib.getExe launchScript}'
+      export MC_INSTANCE_NAME='${instanceName}'
+
+      exec "$MC_LAUNCH_SCRIPT" "$@"
     '';
 
     desktopItem = makeDesktopItem {
@@ -190,9 +197,9 @@ in {
       exec = "${lib.getExe shellCommand}";
       desktopName = desktopName;
       icon = icon;
-      comment = "Nixified Minecraft instance";
+      comment = comment;
       categories = ["Game"];
-      terminal = false;
+      terminal = openInTerminal;
     };
   in
     symlinkJoin {

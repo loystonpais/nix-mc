@@ -1,9 +1,14 @@
 {...} @ self: let
-  mkBuilders = {pkgs}: let
+  mkBuilders = {
+    pkgs,
+    system,
+    ...
+  }: let
     self' =
       self
       // {
         inherit pkgs;
+        inherit system;
         inherit fetchers;
         inherit misc;
         inherit modrinth;

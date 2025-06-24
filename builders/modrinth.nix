@@ -7,6 +7,8 @@ in {
     runCommand ? pkgs.runCommand,
     unzip ? pkgs.unzip,
   }: let
+    # Some zips have weird permissions,
+    # so we need to fix them
     unpacked =
       runCommand "mrpack-unpacked" {
         buildInputs = [unzip];

@@ -23,7 +23,7 @@
     });
 
     self' =
-      inputs
+      self
       // {
         inherit lib;
         inherit sources;
@@ -66,6 +66,7 @@
 
       builders' = builders.factories.mkBuilders {
         inherit pkgs;
+        inherit system;
       };
 
       officialClients = mapAttrs (mkOfficialClientPerSystem builders' system pkgs) versions;
@@ -80,7 +81,20 @@
 
           # servers = ...
         };
-        unofficial = with builders'; {
+        unofficial = with builders'; rec {
+          instances = {
+            test = client.mkMinecraftInstance {
+              addDesktopItem = false;
+              minecraft = speedrunpack-1_16_1;
+              instanceName = "Test speedrun pack instance";
+            };
+            test-ephemeral-instance = client.mkMinecraftInstance {
+              addDesktopItem = false;
+              launchScript = self.scripts.${system}.mc-client-launch-scripts.ephemeral;
+              minecraft = speedrunpack-1_16_1;
+              instanceName = "Ephemeral instance";
+            };
+          };
           speedrunpack-1_16_1 = let
             mrpack = modrinth.parseMrpack {
               src = pkgs.fetchurl {
@@ -96,7 +110,7 @@
                 client = true;
                 mcVersion = mrpack.mcVersion;
                 loaderVersion = mrpack.fabricLoaderVersion;
-                sha256Hash = "sha256-A8nSvWJw8UX7CHft5WF2q1+A2OOttvAs9KZIxAL07TE=";
+                sha256Hash = "sha256-V/t1CtOxoX4huwJn89Jz+X+nK1Od6mmEOjC6A6eZjcA=";
               };
             };
 
@@ -139,6 +153,13 @@
                 sha256Hash = "sha256-yFrn4HiaWiBJOPccHpyK9RuiaUfCgjn0mOk+6tumjxc=";
               };
             };
+        };
+      };
+
+      scripts = {
+        mc-client-launch-scripts = {
+          standard = pkgs.callPackage ./scripts/mc-client-launch-scripts/standard.nix {};
+          ephemeral = pkgs.callPackage ./scripts/mc-client-launch-scripts/ephemeral.nix {};
         };
       };
 
