@@ -17,43 +17,137 @@
     nixpkgs,
     flake-utils,
     version-manifest-v2,
-  }: let
+  } @ inputs: let
     lib = nixpkgs.lib.extend (final: prev: {
       self = self.lib final;
     });
 
-    builders = import ./builders {
-      inherit lib;
-    };
+    self' =
+      inputs
+      // {
+        inherit lib;
+        inherit sources;
+        inherit builders;
+      };
+
+    sources = import ./sources self';
+    builders = import ./builders self';
+
+    inherit (lib.self) readJSON;
+    inherit (builtins) listToAttrs map mapAttrs;
+
+    manifest = readJSON version-manifest-v2;
+
+    # Generate a normalized versions attr
+    # { "1.16.1" = ...; "1.21.4" = ...; ... }
+    versions = listToAttrs (map (versionInfo: {
+        name = versionInfo.id;
+        value = versionInfo;
+      })
+      manifest.versions);
+
+    mkOfficialClientPerSystem = builders: system: pkgs: (
+      id: versionInfo:
+        builders.client.mkMinecraftFromVersionInfo {
+          inherit versionInfo;
+          inherit pkgs;
+          minecraftDir = builders.client.mkMinecraftDirFromVersionInfo {
+            inherit versionInfo;
+            inherit system;
+            inherit pkgs;
+          };
+        }
+    );
   in
     flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
       pkgs = import nixpkgs {
         inherit system;
       };
 
-      minecraft =
-        import ./minecraft-launcher.nix
-        {
-          inherit pkgs;
-          mcManifest = version-manifest-v2;
-        };
-      clients = builtins.mapAttrs (name: value: value.client) minecraft.versions;
-      servers = builtins.mapAttrs (name: value: value.server) minecraft.versions;
+      builders' = builders.factories.mkBuilders {
+        inherit pkgs;
+      };
+
+      officialClients = mapAttrs (mkOfficialClientPerSystem builders' system pkgs) versions;
     in {
       packages = {
-        oldType = {
-          inherit clients;
-          inherit servers;
+        official = {
+          clients =
+            officialClients
+            // {
+              latestRelease = officialClients.${manifest.latest.release};
+            };
+
+          # servers = ...
         };
-        builders = builders {
-          manifest = version-manifest-v2;
-          pkgs = pkgs;
+        unofficial = with builders'; {
+          speedrunpack-1_16_1 = let
+            mrpack = modrinth.parseMrpack {
+              src = pkgs.fetchurl {
+                url = "https://cdn.modrinth.com/data/1uJaMUOm/versions/rycNlp7U/SpeedrunPack-mc1.16.1-v4.6.0.mrpack";
+                hash = "sha256-xIL62QBD7qPTgiSYVI2ROaM0xjKMQ1K1gBVzZdI983Q=";
+              };
+            };
+          in
+            client.mkMinecraftFromMrpack {
+              inherit mrpack;
+              minecraft = officialClients.${mrpack.mcVersion};
+              fabricLoader = fetchers.fetchFabricLoaderImpure {
+                client = true;
+                mcVersion = mrpack.mcVersion;
+                loaderVersion = mrpack.fabricLoaderVersion;
+                sha256Hash = "sha256-A8nSvWJw8UX7CHft5WF2q1+A2OOttvAs9KZIxAL07TE=";
+              };
+            };
+
+          fabulously-optimized-1_16_5 = let
+            mrpack = modrinth.parseMrpack {
+              src = pkgs.fetchurl {
+                url = "https://cdn.modrinth.com/data/1KVo5zza/versions/1.12.3/Fabulously%20Optimized-1.12.3.mrpack";
+                hash = "sha256-jj9mOU2SoKf8aF6VEhj1UmUQDKmqPN+0jK8m10/qL8Q=";
+              };
+            };
+          in
+            client.mkMinecraftFromMrpack {
+              inherit mrpack;
+              minecraft = officialClients.${mrpack.mcVersion}.overrideAttrs {
+                jre = pkgs.jre8;
+              };
+              fabricLoader = fetchers.fetchFabricLoaderImpure {
+                client = true;
+                mcVersion = mrpack.mcVersion;
+                loaderVersion = mrpack.fabricLoaderVersion;
+                sha256Hash = "sha256-/gAav/wOpefX5N+zOqTgjKoJNps2oQXhjaoA8mBLHU8=";
+              };
+            };
+
+          simply-optimized-1_21 = let
+            mrpack = modrinth.parseMrpack {
+              src = pkgs.fetchurl {
+                url = "https://cdn.modrinth.com/data/BYfVnHa7/versions/UAbWeR2g/Simply%20Optimized-1.21-1.0.mrpack";
+                hash = "sha256-3e5Yp00ZEhrr+h/nTNJ1VHJ5RvkEjpCLIb9uJMYxbXQ=";
+              };
+            };
+          in
+            client.mkMinecraftFromMrpack {
+              inherit mrpack;
+              minecraft = officialClients."${mrpack.mcVersion}";
+              fabricLoader = fetchers.fetchFabricLoaderImpure {
+                client = true;
+                mcVersion = mrpack.mcVersion;
+                loaderVersion = mrpack.fabricLoaderVersion;
+                sha256Hash = "sha256-yFrn4HiaWiBJOPccHpyK9RuiaUfCgjn0mOk+6tumjxc=";
+              };
+            };
         };
       };
 
       formatter = pkgs.alejandra;
     })
     // {
+      inherit builders;
+      inherit sources;
+
       lib = import ./lib;
     };
 }
