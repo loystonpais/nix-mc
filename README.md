@@ -12,5 +12,5 @@ Supports mrpack mods (only fabric based)
 To run minecraft in the current directory
 
 ```sh
-nix run github:loystonpais/nix-minecraft-launcher#packages.x86_64-linux.official.\"1.16.1\"
+nix run github:loystonpais/nix-mc#packages.x86_64-linux.official.\"1.16.1\"
 ```
