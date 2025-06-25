@@ -1,27 +1,16 @@
-# Minecraft launcher in nix
+# Minecraft launcher in nix (WIP)
 
 Adoped from https://gist.github.com/eyJhb/623c723ddf068a1c8de26e1ca467f002
 
 # Features
 
-Added version manifest as a flake input
+Support fabric loader
+Supports mrpack mods (only fabric based)
 
 # Usage
 
-Update version manifest by running `nix flake update version-manifest-v2`
+To run minecraft in the current directory
 
-# Usage 2
-
-```nix
-{
-  inputs.url = "github:loystonpais/nix-minecraft-launcher";
-
-  outputs = {
-    nix-minecraft-launcher,
-    ...
-  }: {
-    ...
-  }
-}
-# Packages can be accessed using nix-minecraft-launcher.packages.${system}.clients.v1_16_1
+```sh
+nix run github:loystonpais/nix-minecraft-launcher#packages.x86_64-linux.official.\"1.16.1\"
 ```

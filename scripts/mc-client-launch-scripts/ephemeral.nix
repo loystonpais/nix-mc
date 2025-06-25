@@ -1,3 +1,4 @@
+# Fully ephemeral. Nothing is saved
 {
   writeShellScriptBin,
   coreutils,

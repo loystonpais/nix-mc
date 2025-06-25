@@ -90,9 +90,43 @@
             };
             test-ephemeral-instance = client.mkMinecraftInstance {
               addDesktopItem = false;
-              launchScript = self.scripts.${system}.mc-client-launch-scripts.ephemeral;
+              launchBin = self.scripts.${system}.mc-client-launch-scripts.ephemeral;
               minecraft = speedrunpack-1_16_1;
               instanceName = "Ephemeral instance";
+            };
+            test-semi-ephemeral-instance = client.mkMinecraftInstance {
+              addDesktopItem = false;
+              launchBin = self.scripts.${system}.mc-client-launch-scripts.semi-ephemeral;
+              minecraft = speedrunpack-1_16_1;
+              instanceName = "Semi Ephemeral instance";
+            };
+            test-idk-instance = client.mkMinecraftInstance {
+              addDesktopItem = false;
+              launchBin = self.scripts.${system}.mc-client-launch-scripts.ephemeral;
+              minecraft = speedrunpack-1_16_1.overrideAttrs (final: prev: {
+                preRunScript = pkgs.writeShellScript "prelaunch-script" ''
+                  set -euo pipefail
+                  ${prev.preRunScript}
+
+                  src="$HOME/nixconfig/assets/minecraft/mcsr-config"
+                  dst="./config/mcsr"
+
+                  find "$src" -type f | while read -r file; do
+                    rel="''${file#$src/}"
+                    target="$dst/$rel"
+
+                    # Create destination directory if needed
+                    mkdir -p "$(dirname "$target")"
+
+                    # Remove existing file/symlink if any
+                    [ -e "$target" ] && rm -f "$target"
+
+                    # Create symlink
+                    ln -s "$file" "$target"
+                  done
+                '';
+              });
+              instanceName = "Idk instance";
             };
           };
           speedrunpack-1_16_1 = let
@@ -160,6 +194,7 @@
         mc-client-launch-scripts = {
           standard = pkgs.callPackage ./scripts/mc-client-launch-scripts/standard.nix {};
           ephemeral = pkgs.callPackage ./scripts/mc-client-launch-scripts/ephemeral.nix {};
+          semi-ephemeral = pkgs.callPackage ./scripts/mc-client-launch-scripts/semi-ephemeral.nix {};
         };
       };
 

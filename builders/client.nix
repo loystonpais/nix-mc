@@ -7,6 +7,7 @@
   ...
 } @ self: let
   inherit (lib) concatMapStringsSep hasSuffix makeLibraryPath;
+  inherit (lib.strings) escapeShellArgs escapeShellArg;
   inherit (lib.self) readJSON;
   inherit (lib.self.manifest) mkAssetHashPath filterArtifacts;
   inherit (builtins) toJSON mapAttrs attrValues dirOf toFile elemAt;
@@ -51,11 +52,8 @@ in {
       ],
     mainClass,
     minecraftDir,
-    # avoid using gameDir
-    # it exists for the sake of convenience while overriding
-    gameDir ? ".",
-    minecraftOptions ? "",
-    jreOptions ? "",
+    extraMinecraftOptions ? [],
+    extraJreOptions ? [],
     id,
     accessTokenPath ? misc.dummyTokenPath {inherit (pkgs) writeText;},
     assetType,
@@ -64,7 +62,7 @@ in {
     assetType = validateAssetType attrs.assetType;
     libPath = makeLibraryPath libs;
   in
-    stdenvNoCC.mkDerivation rec {
+    stdenvNoCC.mkDerivation {
       name = "minecraft-client-${id}";
       version = id;
 
@@ -78,10 +76,10 @@ in {
       inherit libPath;
       inherit mainClass;
       inherit jre;
-      inherit gameDir;
-      inherit jreOptions;
-      inherit minecraftOptions;
       inherit preRunScript;
+      gameDir = ".";
+      extraJreOptions = escapeShellArgs extraJreOptions;
+      extraMinecraftOptions = escapeShellArgs extraMinecraftOptions;
 
       buildInputs = [
         makeWrapper
@@ -104,7 +102,7 @@ in {
 
         makeWrapper $jre/bin/java $out/bin/minecraft \
             --run "$preRunScript" \
-            --add-flags "$jreOptions" \
+            --add-flags "$extraJreOptions" \
             --add-flags "\$JRE_OPTIONS_OVERRIDE" \
             --add-flags "-Djava.library.path='$DIR/natives'" \
             --add-flags "-cp '$(find $DIR/libraries -name '*.jar' | tr -s '\n' ':')'" \
@@ -113,8 +111,8 @@ in {
             --add-flags "--assetsDir '$assetDir'" \
             --add-flags "--assetIndex '$assetType'" \
             --add-flags "--accessToken \"\$(cat '$accessTokenPath')\"" \
-            --add-flags "--gameDir \"$gameDir\"" \
-            --add-flags "$minecraftOptions" \
+            --add-flags "--gameDir '$gameDir'" \
+            --add-flags "$extraMinecraftOptions" \
             --add-flags "\$MC_OPTIONS_OVERRIDE" \
             --prefix LD_LIBRARY_PATH : "$libPath"
       '';
@@ -163,7 +161,7 @@ in {
     icon ? null,
     openInTerminal ? false,
     comment ? "Nixified Minecraft instance",
-    launchScript ? self.scripts.${system}.mc-client-launch-scripts.standard,
+    launchBin ? self.scripts.${system}.mc-client-launch-scripts.standard,
     pkgs ? self.pkgs,
     makeWrapper ? pkgs.makeWrapper,
     makeDesktopItem ? pkgs.makeDesktopItem,
@@ -186,7 +184,7 @@ in {
 
     shellCommand = writeShellScriptBin commandName ''
       export MC_COMMAND='${minecraft}/bin/minecraft'
-      export MC_LAUNCH_SCRIPT='${lib.getExe launchScript}'
+      export MC_LAUNCH_SCRIPT='${lib.getExe launchBin}'
       export MC_INSTANCE_NAME='${instanceName}'
 
       exec "$MC_LAUNCH_SCRIPT" "$@"
