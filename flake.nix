@@ -5,18 +5,12 @@
     flake-utils = {
       url = "github:numtide/flake-utils";
     };
-
-    version-manifest-v2 = {
-      url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-      flake = false;
-    };
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-    version-manifest-v2,
   } @ inputs: let
     lib = nixpkgs.lib.extend (final: prev: {
       self = self.lib final;
@@ -36,7 +30,7 @@
     inherit (lib.self) readJSON;
     inherit (builtins) listToAttrs map mapAttrs;
 
-    manifest = readJSON version-manifest-v2;
+    manifest = sources.version-manifest-v2;
 
     # Generate a normalized versions attr
     # { "1.16.1" = ...; "1.21.4" = ...; ... }
@@ -69,15 +63,18 @@
         inherit system;
       };
 
-      officialClients = mapAttrs (mkOfficialClientPerSystem builders' system pkgs) versions;
+      officialClients' = mapAttrs (mkOfficialClientPerSystem builders' system pkgs) versions;
+      officialClients =
+        officialClients'
+        // {
+          latestRelease = officialClients'.${manifest.latest.release};
+          latestSnapshot = officialClients'.${manifest.latest.snapshot};
+        };
     in {
       packages = {
         official = {
           clients =
-            officialClients
-            // {
-              latestRelease = officialClients.${manifest.latest.release};
-            };
+            officialClients;
 
           # servers = ...
         };
@@ -195,6 +192,23 @@
           standard = pkgs.callPackage ./scripts/mc-client-launch-scripts/standard.nix {};
           ephemeral = pkgs.callPackage ./scripts/mc-client-launch-scripts/ephemeral.nix {};
           semi-ephemeral = pkgs.callPackage ./scripts/mc-client-launch-scripts/semi-ephemeral.nix {};
+        };
+
+        run-in-repo = rec {
+          update-asset-sha256 =
+            pkgs.writers.writePython3Bin "update-asset-sha256" {
+              flakeIgnore = ["E501" "E265"];
+            }
+            (builtins.readFile ./scripts/update-asset-sha256.py);
+          update-version-manifest-v2 =
+            pkgs.writeShellScriptBin "update-version-manifest-v2"
+            (builtins.readFile ./scripts/update-version-manifest-v2.sh);
+
+          updateAssetSha256SourcesWithClient = mapAttrs (name: client:
+            pkgs.writeShellScriptBin "update-asset-sha256-with-client-${name}" ''
+              ${lib.getExe update-asset-sha256} "${client.minecraftDir}/assets/objects"
+            '')
+          officialClients;
         };
       };
 
