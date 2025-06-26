@@ -59,7 +59,7 @@
     "version-manifest-v2": {
       "flake": false,
       "locked": {
-        "narHash": "sha256-AGA+v8iAvKq0cPPp5YtOEboeMyFXMjcKZDH0xIOE2Ng=",
+        "narHash": "sha256-yEINrZY/mhuuLo6utiMGbPfwVK3sO0szkBXQbXMUnPM=",
         "type": "file",
         "url": "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
       },
