@@ -2,6 +2,8 @@ name: Update Sources
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 */12 * * *" # Every 12 hours (at 00:00 and 12:00 UTC)
 
 jobs:
   update:
@@ -20,16 +22,13 @@ jobs:
         run: |
           nix run .#scripts.x86_64-linux.run-in-repo.update-version-manifest-v2
 
-          nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestSnapshot
-          nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestRelease
-
-          #if git diff --quiet sources/version_manifest_v2.json; then
-          #  echo "Manifest unchanged. Skipping asset SHA updates."
-          #else
-          #  echo "Manifest changed. Running SHA update scripts..."
-          #  nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestSnapshot
-          #  nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestRelease
-          #fi
+          if git diff --quiet sources/version_manifest_v2.json; then
+            echo "Manifest unchanged. Skipping asset SHA updates."
+          else
+            echo "Manifest changed. Running SHA update scripts..."
+            nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestSnapshot
+            nix run .#scripts.x86_64-linux.run-in-repo.updateAssetSha256SourcesWithClient.latestRelease
+          fi
 
       - name: Commit and push if changed
         run: |
