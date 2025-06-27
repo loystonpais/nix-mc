@@ -387,14 +387,15 @@ in {
       # Place files (mods) in the dir where minecraft is executed
       placeFiles =
         concatMapStringsSep "\n" (file: ''
-          mkdir -p "$gameDir/${dirOf file.path}"
-          if ln -s "${file.src}" "$gameDir/${file.path}" 2>/dev/null; then
-            echo "Linked: $gameDir/${file.path} → ${file.src}"
-          elif [ -e "$gameDir/${file.path}" ]; then
-            echo "Skipped: $gameDir/${file.path} (already exists)"
+          src="${file.src}"
+          dst="$gameDir/${file.path}"
+          mkdir -p "$(dirname "$dst")"
+          if [ -e "$dst" ]; then
+            echo "Skipped: $dst (already exists)"
           else
-            echo "Error: Failed to link $gameDir/${file.path}" >&2
-            exit 1
+            cp -a "$src" "$dst"
+            chmod 444 "$dst"
+            echo "Copied: $dst"
           fi
         '')
         filesListWithPath;
