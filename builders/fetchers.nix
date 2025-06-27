@@ -6,6 +6,7 @@
 } @ self: let
   inherit (lib.self) readJSON;
   inherit (lib.self.manifest) mkAssetHashPath;
+  inherit (lib) escapeShellArg;
 in {
   # This is a makeshift implementation of fetchFabricLoader
   # Should be avoided
@@ -41,8 +42,8 @@ in {
         mkdir -p $out
         java -jar ${fabricInstaller} ${mode} \
           -dir $out \
-          -mcversion "${mcVersion}" \
-          -loader "${loaderVersion}" \
+          -mcversion ${escapeShellArg mcVersion} \
+          -loader ${escapeShellArg loaderVersion} \
           -noprofile
         rm -rf $out/versions
       '';
