@@ -101,7 +101,7 @@
               addDesktopItem = false;
               launchBin = self.scripts.${system}.mc-client-launch-scripts.ephemeral;
               minecraft = speedrunpack-1_16_1.overrideAttrs (final: prev: {
-                preRunScript = pkgs.writeShellScript "prelaunch-script" ''
+                preRunScript = pkgs.writeShellScript "prerun-script" ''
                   set -euo pipefail
                   ${prev.preRunScript}
 
